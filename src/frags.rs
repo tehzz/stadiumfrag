@@ -68,7 +68,7 @@ impl FragInfo {
     }
 }
 
-pub fn find_fragments(p: PathBuf) -> Result<()> {
+pub fn find_fragments(p: PathBuf, print_seg_info: bool) -> Result<()> {
     let rom = std::fs::read(p).context("reading ROM")?;
     let re = Regex::new("FRAGMENT").unwrap();
 
@@ -84,7 +84,9 @@ pub fn find_fragments(p: PathBuf) -> Result<()> {
                 info.number,
                 info.rom_offset + frag.rom_size as usize
             );
-            println!("\t{:x} code bytes + {:x} bss", info.rom_code, info.bss_size);
+            if print_seg_info {
+                println!("\t{:x} code bytes + {:x} bss", info.rom_code, info.bss_size);
+            }
         } else {
             // let hdr: [u8; 0x20] = header.try_into().unwrap();
             // let test = Fragment::from(hdr);
