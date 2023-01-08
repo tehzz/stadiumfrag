@@ -37,9 +37,10 @@ pub fn find_presjpeg(p: PathBuf) -> Result<()> {
             .windows(2)
             .take_while(|c| c != jpeg_end)
             .count()
+            + 2
             + header.offset as usize;
 
-        println!("{:#x} - presjpeg -> {:#x}", start, start + size);
+        println!("{:#X} - presjpeg -> {:#X}", start, start + size);
     }
 
     Ok(())
