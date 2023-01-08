@@ -71,24 +71,21 @@ pub fn find_yay0_files(p: PathBuf) -> Result<()> {
     let rom = std::fs::read(p).context("reading ROM")?;
     let re = Regex::new("Yay0").unwrap();
 
-    for (i, mat) in re.find_iter(&rom).enumerate() {
-        let data = &rom[mat.start()..];
+    for mat in re.find_iter(&rom) {
+        let start = mat.start();
+        let data = &rom[start..];
         let (decomp, compsize) = decompress_count(data).context("decompressing yay0")?;
+        let is_frag = &decomp[8..16] == b"FRAGMENT";
+        let is_szp = &rom[start - 0x18..start - 0x10] == b"PERS-SZP";
         println!(
-            "{}\t{:#X} to {:#X} [{:x} comp to {:x} bytes]",
-            i,
-            mat.start(),
-            mat.start() + compsize,
+            "{:#X} - {}Yay0 {}-> {:#X} [{:5x} unpack to {:5x}]",
+            start - if is_szp { 0x18 } else { 0 },
+            if is_szp { "SZP " } else { "" },
+            if is_frag { "Fragment " } else { "" },
+            start + compsize,
             compsize,
             decomp.len()
         );
-        if &decomp[8..16] == b"FRAGMENT" {
-            println!("\tfound fragment!")
-        }
-        // println!("\t{:02X?}", &decomp[0..8]);
-        // println!("\t{:02X?}", &decomp[8..16]);
-        // println!("\t{:02X?}", &decomp[16..24]);
-        // println!("\t{:02X?}", &decomp[24..32]);
     }
 
     Ok(())
