@@ -3,13 +3,24 @@ use regex::bytes::Regex;
 use std::{fmt, path::PathBuf};
 
 #[derive(Debug, Copy, Clone)]
-struct Fragment {
+pub struct Fragment {
     instrs: [u32; 2],
     magic: [u8; 8],
     entry: u32,
     reloc: u32,
     rom_size: u32,
     ram_size: u32,
+}
+
+impl Fragment {
+    pub const fn number(&self) -> u8 {
+        const ADDR_MASK: u32 = (1 << 26) - 1;
+        const NUM_MASK: u32 = 0x0FF00000 >> 2;
+
+        let num = ((self.instrs[0] & (ADDR_MASK & NUM_MASK)) >> 18) - 0x10;
+
+        return num as u8;
+    }
 }
 
 impl From<[u8; 0x20]> for Fragment {
@@ -57,10 +68,8 @@ impl FragInfo {
         let rom_code = frag.rom_size - frag.reloc;
         let bss_size = frag.ram_size - rom_code;
 
-        let number = extract_number_from_j(frag.instrs[0]);
-
         Self {
-            number,
+            number: frag.number(),
             rom_offset,
             rom_code,
             bss_size,
@@ -95,13 +104,4 @@ pub fn find_fragments(p: PathBuf, print_seg_info: bool) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn extract_number_from_j(op: u32) -> u8 {
-    const ADDR_MASK: u32 = (1 << 26) - 1;
-    const NUM_MASK: u32 = 0x0FF00000 >> 2;
-
-    let frag = ((op & (ADDR_MASK & NUM_MASK)) >> 18) - 0x10;
-
-    return frag as u8;
 }

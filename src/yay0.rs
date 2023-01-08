@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use bitstream_io::{BigEndian, BitRead, BitReader, ByteRead, ByteReader};
 use regex::bytes::Regex;
-use std::{cmp::Ordering, io::Cursor, path::PathBuf};
+use std::{borrow::Cow, cmp::Ordering, io::Cursor, path::PathBuf};
 
 #[derive(Debug)]
 struct Yay0Hdr {
@@ -75,13 +75,19 @@ pub fn find_yay0_files(p: PathBuf) -> Result<()> {
         let start = mat.start();
         let data = &rom[start..];
         let (decomp, compsize) = decompress_count(data).context("decompressing yay0")?;
-        let is_frag = &decomp[8..16] == b"FRAGMENT";
         let is_szp = &rom[start - 0x18..start - 0x10] == b"PERS-SZP";
+        let frag = if &decomp[8..16] == b"FRAGMENT" {
+            let hdr: [u8; 0x20] = decomp[..0x20].try_into().unwrap();
+            let num = crate::frags::Fragment::try_from(hdr)?.number();
+            Cow::from(format!("Frag #{num} "))
+        } else {
+            Cow::from("")
+        };
         println!(
             "{:#X} - {}Yay0 {}-> {:#X} [{:5x} unpack to {:5x}]",
             start - if is_szp { 0x18 } else { 0 },
             if is_szp { "SZP " } else { "" },
-            if is_frag { "Fragment " } else { "" },
+            frag,
             start + compsize,
             compsize,
             decomp.len()
