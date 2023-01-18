@@ -8,8 +8,12 @@ use regex::bytes::Regex;
 struct PersSzp {
     magic: [u8; 8],
     offset: u32,
+    // RAM size after decompression?
     size: u32,
     size_again: u32,
+    num_updates: u32,
+    // (update_value, offset) (maybe?)
+    updates: Vec<(u32, usize)>,
 }
 
 impl fmt::Display for PersSzp {
@@ -28,20 +32,34 @@ impl fmt::Display for PersSzp {
     }
 }
 
-impl TryFrom<[u8; 0x18]> for PersSzp {
+impl TryFrom<&[u8]> for PersSzp {
     type Error = anyhow::Error;
 
-    fn try_from(value: [u8; 0x18]) -> Result<Self, Self::Error> {
-        let magic = value[0..8].try_into()?;
-        let offset = u32::from_be_bytes(value[8..12].try_into()?);
-        let size = u32::from_be_bytes(value[12..16].try_into()?);
-        let size_again = u32::from_be_bytes(value[16..20].try_into()?);
+    fn try_from(v: &[u8]) -> Result<Self, Self::Error> {
+        const MAGIC_BYTES: &[u8] = b"PERS-SZP";
+
+        let magic = v[0..8].try_into()?;
+        if &magic != MAGIC_BYTES {
+            anyhow::bail!("Expected <{:x?}> for magic, got <{:x?}>", MAGIC_BYTES, &magic);
+        }
+        let offset = u32::from_be_bytes(v[0x8..0xC].try_into()?);
+        let size = u32::from_be_bytes(v[0xC..0x10].try_into()?);
+        let size_again = u32::from_be_bytes(v[0x10..0x14].try_into()?);
+        let num_updates = u32::from_be_bytes(v[0x14..0x18].try_into()?);
+        let updates = v[0x18..0x18+2*4*num_updates as usize]
+            .chunks(8)
+            .map(|c| (
+                u32::from_be_bytes(c[..4].try_into().unwrap()), 
+                u32::from_be_bytes(c[4..].try_into().unwrap()) as usize, 
+            )).collect();
 
         Ok(Self {
             magic,
             offset,
             size,
             size_again,
+            num_updates,
+            updates
         })
     }
 }
@@ -52,8 +70,7 @@ pub fn find_pers_szp(p: PathBuf) -> Result<()> {
 
     for mat in re.find_iter(&rom) {
         let start = mat.start();
-        let raw: [u8; 0x18] = rom[start..start + 0x18].try_into()?;
-        let header = PersSzp::try_from(raw)?;
+        let header = PersSzp::try_from(&rom[start..])?;
         let data_start = start + header.offset as usize;
         let test = &rom[data_start..data_start + 4];
 
@@ -62,6 +79,9 @@ pub fn find_pers_szp(p: PathBuf) -> Result<()> {
             println!("{s}");
         } else {
             println!("{:x?}", test);
+        }
+        if header.num_updates != 0 {
+            println!("\tUpdates: {:X?}", header.updates);
         }
     }
 

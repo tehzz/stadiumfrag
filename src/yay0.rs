@@ -83,16 +83,40 @@ pub fn find_yay0_files(p: PathBuf) -> Result<()> {
         } else {
             Cow::from("")
         };
+        let possible_next = if start >= 0x7C0000 && start < 0x8CC400 {
+            align4(start + compsize)
+        } else if start >= 0x16F2814 && start < 0x17DC340 {
+            if (start + compsize) & 4 == 0 {
+                start + compsize 
+            } else {
+                align16(start + compsize) + 4
+            }
+        } else {
+            align16(start + compsize)
+        };
         println!(
-            "{:#X} - {}Yay0 {}-> {:#X} [{:5x} unpack to {:5x}]",
+            "{:#X} - {}Yay0 {}-> {:#X} {:#X} [{:5x} unpack to {:5x}]",
             start - if is_szp { 0x18 } else { 0 },
             if is_szp { "SZP " } else { "" },
             frag,
             start + compsize,
+            possible_next,
             compsize,
             decomp.len()
         );
     }
 
     Ok(())
+}
+
+const fn align(by: usize, x: usize) -> usize {
+    return (x + (by - 1)) & !(by - 1)
+}
+
+const fn align16(x: usize) -> usize {
+    return align(16, x)
+}
+
+const fn align4(x: usize) -> usize {
+    return align(4, x)
 }
